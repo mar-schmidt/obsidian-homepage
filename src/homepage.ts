@@ -27,7 +27,8 @@ export interface HomepageData {
 	pin: boolean,
 	commands: CommandData[],
 	alwaysApply: boolean,
-	hideReleaseNotes: boolean
+	hideReleaseNotes: boolean,
+	webHideHeader: boolean
 } 
 
 export interface CommandData {
@@ -211,7 +212,7 @@ export class Homepage {
 		
 		const leaf = this.app.workspace.getLeaf(mode == Mode.Retain);
 		
-		await leaf.setViewState({ type: WEB_VIEW_TYPE, state: { url }, active: true });
+		await leaf.setViewState({ type: WEB_VIEW_TYPE, state: { url, hideHeader: this.data.webHideHeader !== false }, active: true });
 		this.app.workspace.setActiveLeaf(leaf);
 		
 		return leaf;

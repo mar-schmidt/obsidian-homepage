@@ -126,5 +126,7 @@ export const EN: Record<string, string> = {
 	homepageSettingTitle: "Homepage",
 	pluginUnavailableSettings: `The plugin required for this homepage type isn't available.`,
 	webPageInvalidSettings: "Enter a full web address that starts with https://",
+	webHideHeader: "Hide the claude.ai header",
+	webHideHeaderDesc: "On claude.ai pages, hide the bar above the page with the chat and share buttons. Use Open in browser when you need them.",
 	copyDebugInfoNotice: "Copied homepage debug information to clipboard",
 };

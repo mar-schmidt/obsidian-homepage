@@ -38,7 +38,8 @@ export const DEFAULT_DATA: HomepageData = {
 	pin: false,
 	commands: [],
 	alwaysApply: false,
-	hideReleaseNotes: false
+	hideReleaseNotes: false,
+	webHideHeader: true
 };
 
 const DISABLED_KINDS: Partial<Record<HomepageKey<boolean | string>, Kind[]>> = {
@@ -114,6 +115,7 @@ export class HomepageSettingTab extends PluginSettingTab {
 			}
 			
 			kindControls = [setting as unknown as SettingGroupItem];
+			if (activeKind === Kind.WebPage) kindControls.push(this.createToggle("webHideHeader"));
 		}
 		
 		return [

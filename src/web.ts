@@ -10,6 +10,7 @@ interface WebviewElement extends HTMLElement {
 	partition: string;
 	allowpopups: boolean;
 	reload(): void;
+	executeJavaScript(code: string): Promise<unknown>;
 }
 
 type WebviewEvent = Event & {
@@ -21,6 +22,55 @@ type WebviewEvent = Event & {
 };
 
 type ElectronRenderer = { ipcRenderer?: { send(channel: string, ...args: unknown[]): void } };
+
+/**
+ * Runs inside a claude.ai page and hides what claude.ai draws above an artifact (the bar with the chat
+ * and share buttons), so the artifact fills the tab. It only hides elements that sit wholly above the
+ * largest frame on the page, and never dialogs or anything that asks for permission.
+ */
+const HIDE_CLAUDE_HEADER = `(() => {
+	if (window.__nvHomepageHeader) return;
+	window.__nvHomepageHeader = true;
+	const MARK = "data-nv-homepage-hidden";
+	const style = document.createElement("style");
+	style.textContent = "[" + MARK + "] { display: none !important; }";
+	(document.head || document.documentElement).appendChild(style);
+	const KEEP = /allow|approve|permission|review|deny|connect|access|sign in|tillåt|godkänn|behörighet|neka|anslut|åtkomst|logga in/i;
+	const area = el => { const r = el.getBoundingClientRect(); return r.width * r.height; };
+	const tidy = () => {
+		const frames = Array.from(document.querySelectorAll("iframe")).filter(f => area(f) > 60000);
+		if (!frames.length) return;
+		const frame = frames.reduce((a, b) => (area(b) > area(a) ? b : a));
+		const top = frame.getBoundingClientRect().top;
+		if (top < 4) return;
+		for (let node = frame; node && node !== document.body; node = node.parentElement) {
+			for (let sib = node.previousElementSibling; sib; sib = sib.previousElementSibling) {
+				if (sib.hasAttribute(MARK) || /^(STYLE|SCRIPT|LINK|META)$/.test(sib.tagName)) continue;
+				if (sib.matches("[role=dialog], [role=alertdialog], [aria-modal=true]") || KEEP.test(sib.textContent || "")) continue;
+				const r = sib.getBoundingClientRect();
+				if (r.height > 0 && r.height < 160 && r.bottom <= top + 2) sib.setAttribute(MARK, "");
+			}
+		}
+	};
+	let timer = null;
+	const schedule = () => {
+		if (timer) return;
+		timer = setTimeout(() => { timer = null; tidy(); }, 60);
+	};
+	new MutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
+	window.addEventListener("resize", schedule);
+	tidy();
+})();`;
+
+function isClaudePage(url: string): boolean {
+	try {
+		const host = new URL(url).hostname;
+		return host === "claude.ai" || host.endsWith(".claude.ai");
+	}
+	catch {
+		return false;
+	}
+}
 
 export function normalizeUrl(value: string): string | null {
 	const raw = (value || "").trim();
@@ -49,6 +99,7 @@ export class HomepageWebView extends ItemView {
 	url: string = "";
 	title: string = "";
 	currentUrl: string = "";
+	hideHeader: boolean = true;
 	webview: WebviewElement | null = null;
 
 	getViewType(): string {
@@ -76,12 +127,13 @@ export class HomepageWebView extends ItemView {
 	}
 
 	getState(): Record<string, unknown> {
-		return { ...super.getState(), url: this.url };
+		return { ...super.getState(), url: this.url, hideHeader: this.hideHeader };
 	}
 
 	async setState(state: unknown, result: ViewStateResult): Promise<void> {
-		const url = (state as { url?: unknown } | null)?.url;
+		const { url, hideHeader } = (state ?? {}) as { url?: unknown, hideHeader?: unknown };
 
+		if (typeof hideHeader === "boolean") this.hideHeader = hideHeader;
 		if (typeof url === "string" && url !== this.url) {
 			this.url = url;
 			this.render();
@@ -138,6 +190,11 @@ export class HomepageWebView extends ItemView {
 			this.contentEl.querySelector(".nv-web-message")?.remove();
 		});
 		webview.addEventListener("did-stop-loading", () => this.contentEl.removeClass("is-loading"));
+		webview.addEventListener("dom-ready", () => {
+			if (this.hideHeader && isClaudePage(this.currentUrl || url)) {
+				webview.executeJavaScript(HIDE_CLAUDE_HEADER).catch(() => {});
+			}
+		});
 		webview.addEventListener("did-fail-load", (e: WebviewEvent) => {
 			//-3 is an aborted load, which redirects cause all the time
 			if (!e.isMainFrame || e.errorCode === -3) return;
