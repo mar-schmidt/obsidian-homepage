@@ -11,6 +11,7 @@ interface WebviewElement extends HTMLElement {
 	allowpopups: boolean;
 	reload(): void;
 	executeJavaScript(code: string): Promise<unknown>;
+	insertCSS(css: string): Promise<string>;
 }
 
 type WebviewEvent = Event & {
@@ -24,17 +25,23 @@ type WebviewEvent = Event & {
 type ElectronRenderer = { ipcRenderer?: { send(channel: string, ...args: unknown[]): void } };
 
 /**
- * Runs inside a claude.ai page and hides what claude.ai draws above an artifact (the bar with the chat
- * and share buttons), so the artifact fills the tab. It only hides elements that sit wholly above the
- * largest frame on the page, and never dialogs or anything that asks for permission.
+ * claude.ai's artifact page: a 40px header (#hdr, with the chat and share buttons) under a fixed strip
+ * (#top-edge), and the artifact's frame in a <main> placed 40px down. Inserted through Electron, so the
+ * page's Content-Security-Policy, which blocks <style> elements a script adds, doesn't apply.
+ */
+const CLAUDE_HEADER_CSS = `
+#top-edge, #hdr, #hdr-degraded { display: none !important; }
+main:has(> #frame-slot) { top: 0 !important; }
+`;
+
+/**
+ * Fallback for when claude.ai's markup changes and the CSS above no longer matches: hides elements that
+ * sit wholly above the largest frame on the page, never dialogs or anything that asks for permission,
+ * and moves the frame's positioned containers up. Styles are set through the CSSOM, which CSP allows.
  */
 const HIDE_CLAUDE_HEADER = `(() => {
 	if (window.__nvHomepageHeader) return;
 	window.__nvHomepageHeader = true;
-	const MARK = "data-nv-homepage-hidden";
-	const style = document.createElement("style");
-	style.textContent = "[" + MARK + "] { display: none !important; }";
-	(document.head || document.documentElement).appendChild(style);
 	const KEEP = /allow|approve|permission|review|deny|connect|access|sign in|tillåt|godkänn|behörighet|neka|anslut|åtkomst|logga in/i;
 	const area = el => { const r = el.getBoundingClientRect(); return r.width * r.height; };
 	const tidy = () => {
@@ -43,13 +50,22 @@ const HIDE_CLAUDE_HEADER = `(() => {
 		const frame = frames.reduce((a, b) => (area(b) > area(a) ? b : a));
 		const top = frame.getBoundingClientRect().top;
 		if (top < 4) return;
+		let hid = false;
 		for (let node = frame; node && node !== document.body; node = node.parentElement) {
 			for (let sib = node.previousElementSibling; sib; sib = sib.previousElementSibling) {
-				if (sib.hasAttribute(MARK) || /^(STYLE|SCRIPT|LINK|META)$/.test(sib.tagName)) continue;
-				if (sib.matches("[role=dialog], [role=alertdialog], [aria-modal=true]") || KEEP.test(sib.textContent || "")) continue;
+				if (/^(STYLE|SCRIPT|LINK|META)$/.test(sib.tagName) || sib.style.display === "none") continue;
+				if (sib.matches("[role=dialog], [role=alertdialog], [aria-modal=true]") || KEEP.test(sib.innerText || "")) continue;
 				const r = sib.getBoundingClientRect();
-				if (r.height > 0 && r.height < 160 && r.bottom <= top + 2) sib.setAttribute(MARK, "");
+				if (r.height > 0 && r.height < 160 && r.bottom <= top + 2) {
+					sib.style.setProperty("display", "none", "important");
+					hid = true;
+				}
 			}
+		}
+		if (!hid) return;
+		for (let node = frame; node && node !== document.body; node = node.parentElement) {
+			const cs = getComputedStyle(node);
+			if ((cs.position === "absolute" || cs.position === "fixed") && parseFloat(cs.top) > 0) node.style.setProperty("top", "0px", "important");
 		}
 	};
 	let timer = null;
@@ -192,6 +208,7 @@ export class HomepageWebView extends ItemView {
 		webview.addEventListener("did-stop-loading", () => this.contentEl.removeClass("is-loading"));
 		webview.addEventListener("dom-ready", () => {
 			if (this.hideHeader && isClaudePage(this.currentUrl || url)) {
+				webview.insertCSS(CLAUDE_HEADER_CSS).catch(() => {});
 				webview.executeJavaScript(HIDE_CLAUDE_HEADER).catch(() => {});
 			}
 		});
