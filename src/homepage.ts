@@ -1,6 +1,7 @@
 import { App, FileView, MarkdownView, Notice, View as OView, WorkspaceLeaf, WorkspaceWindow } from "obsidian";
 import HomepagePlugin from "./main";
 import { PERIODIC_KINDS, getJournalNote, getPeriodicNote, hasJournal } from "./periodic";
+import { WEB_VIEW_TYPE, normalizeUrl } from "./web";
 import { tr } from "./locale";
 import { DEFAULT_DATA } from "./settings";
 import { detachAllLeaves, emptyActiveView, equalsCaseless, hasLayoutChange, randomFile, sleep } from "./utils";
@@ -49,6 +50,7 @@ export enum View {
 
 export enum Kind {
 	File = "File",
+	WebPage = "Web page",
 	Workspace = "Workspace",
 	Random = "Random file",
 	RandomFolder = "Random in folder",
@@ -69,7 +71,7 @@ export enum Period {
 }
 
 export const UNCHANGEABLE: Kind[] = [Kind.Random, Kind.Graph, Kind.None, ...PERIODIC_KINDS];
-export const ILLEGIBLE: Kind[] = [Kind.None, Kind.Graph, Kind.Workspace];
+export const ILLEGIBLE: Kind[] = [Kind.None, Kind.Graph, Kind.Workspace, Kind.WebPage];
 
 export class Homepage {
 	plugin: HomepagePlugin;
@@ -99,7 +101,7 @@ export class Homepage {
 	
 	async open(alternate: boolean = false): Promise<void> {
 		if (!this.plugin.hasRequiredPlugin(this.data.kind as Kind)) {
-			new Notice(tr("pluginUnavailable"));
+			new Notice(tr(this.data.kind as Kind === Kind.WebPage ? "webPageDesktopOnly" : "pluginUnavailable"));
 			return;
 		}
 		else if (this.data.kind as Kind === Kind.Journal && !(await hasJournal(this))) {
@@ -176,6 +178,7 @@ export class Homepage {
 		
 		try {
 			if (this.data.kind as Kind === Kind.Graph) leaf = await this.launchGraph(mode);
+			else if (this.data.kind as Kind === Kind.WebPage) leaf = await this.launchWebPage(mode);
 			else leaf = await this.launchNote(mode);
 					
 			await this.configure(leaf);
@@ -196,6 +199,22 @@ export class Homepage {
 		
 		this.app.commands.executeCommandById("graph:open");
 		return this.app.workspace.getActiveViewOfType(OView)!.leaf;
+	}
+	
+	async launchWebPage(mode: Mode): Promise<WorkspaceLeaf> {
+		const url = normalizeUrl(this.computedValue);
+		
+		if (!url) {
+			new Notice(tr("webPageInvalid", this.computedValue));
+			throw new Error(tr("webPageInvalid", this.computedValue));
+		}
+		
+		const leaf = this.app.workspace.getLeaf(mode == Mode.Retain);
+		
+		await leaf.setViewState({ type: WEB_VIEW_TYPE, state: { url }, active: true });
+		this.app.workspace.setActiveLeaf(leaf);
+		
+		return leaf;
 	}
 	
 	async launchNote(mode: Mode): Promise<WorkspaceLeaf> {
@@ -283,6 +302,12 @@ export class Homepage {
 	
 	getOpened(): WorkspaceLeaf[] {
 		if (this.data.kind as Kind == Kind.Graph) return this.app.workspace.getLeavesOfType("graph");
+		if (this.data.kind as Kind == Kind.WebPage) {
+			const url = normalizeUrl(this.computedValue);
+			return this.app.workspace.getLeavesOfType(WEB_VIEW_TYPE).filter(
+				leaf => (leaf.getViewState().state as { url?: string } | undefined)?.url === url
+			);
+		}
 		
 		const leaves = LEAF_TYPES.flatMap(i => this.app.workspace.getLeavesOfType(i));
 
@@ -343,7 +368,8 @@ export class Homepage {
 	
 	canSetToFile(): boolean {
 		return (this.app.workspace.getActiveFile() !== null &&
-		!UNCHANGEABLE.includes(this.data.kind as Kind));
+		!UNCHANGEABLE.includes(this.data.kind as Kind) &&
+		this.data.kind as Kind !== Kind.WebPage);
 	}
 	
 	async revertView(): Promise<void> {

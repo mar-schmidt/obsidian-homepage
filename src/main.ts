@@ -4,6 +4,7 @@ import { getJournalsApi, hasRequiredPeriodicity, LEGACY_MOMENT_KIND } from "./pe
 import { DEFAULT_SETTINGS, HomepageSettings, HomepageSettingTab } from "./settings";
 import { untrimName } from "./utils";
 import { tr } from "./locale";
+import { HomepageWebView, WEB_VIEW_TYPE } from "./web";
 
 declare const DEV: boolean;
 if (DEV) void import("./dev");
@@ -30,6 +31,8 @@ export default class HomepagePlugin extends Plugin {
 		this.internalPlugins = this.app.internalPlugins.plugins;
 		this.communityPlugins = this.app.plugins.plugins;
 		this.homepage = this.getHomepage();
+		
+		this.registerView(WEB_VIEW_TYPE, leaf => new HomepageWebView(leaf));
 
 		this.addRibbonIcon(
 			"house", 
@@ -59,25 +62,31 @@ export default class HomepagePlugin extends Plugin {
 			}
 		});
 		
-		this.registerCliHandler(
-			"homepage",
-			tr("cliOpenHomepageDesc"),
-			null,
-			async () => {
-				await this.homepage.open();
-				return tr("cliOpenHomepageResult");
-			}
-		);
-		
-		this.registerCliHandler(
-			"homepage:read",
-			tr("cliReadHomepageDesc"),
-			null,
-			async () => {
-				const result = await this.homepage.read();
-				return result !== undefined ? result : tr("cliReadHomepageIllegible");
-			}
-		);
+		//The original Homepage plugin registers the same CLI handlers; don't fail to load while both are installed
+		try {
+			this.registerCliHandler(
+				"homepage",
+				tr("cliOpenHomepageDesc"),
+				null,
+				async () => {
+					await this.homepage.open();
+					return tr("cliOpenHomepageResult");
+				}
+			);
+			
+			this.registerCliHandler(
+				"homepage:read",
+				tr("cliReadHomepageDesc"),
+				null,
+				async () => {
+					const result = await this.homepage.read();
+					return result !== undefined ? result : tr("cliReadHomepageIllegible");
+				}
+			);
+		}
+		catch (e) {
+			console.warn("Homepage: CLI handlers are already registered by another plugin", e);
+		}
 		
 		if (DEV) window.homepage = this;
 	}
@@ -154,6 +163,8 @@ export default class HomepagePlugin extends Plugin {
 				return this.internalPlugins["workspaces"]?.enabled;
 			case Kind.Graph:
 				return this.internalPlugins["graph"]?.enabled;
+			case Kind.WebPage:
+				return Platform.isDesktopApp;
 			case Kind.Journal:
 				return getJournalsApi(this.app) !== null;
 			case Kind.DailyNote:

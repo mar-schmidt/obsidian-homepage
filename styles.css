@@ -182,3 +182,55 @@
 	height: 100%;
 	margin: 0;
 }
+
+.workspace-leaf-content[data-type="homepage-web"] > .view-content.nv-web-view {
+	padding: 0;
+	overflow: hidden;
+	position: relative;
+}
+
+.nv-web-view .nv-web-frame {
+	display: flex;
+	width: 100%;
+	height: 100%;
+	border: 0;
+	background-color: var(--background-primary);
+}
+
+.nv-web-view.is-loading::before {
+	content: "";
+	position: absolute;
+	inset: 0 auto auto 0;
+	width: 30%;
+	height: 2px;
+	z-index: 2;
+	background-color: var(--interactive-accent);
+	animation: nv-web-loading 1.1s ease-in-out infinite;
+}
+
+@keyframes nv-web-loading {
+	from { transform: translateX(-100%); }
+	to { transform: translateX(340%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.nv-web-view.is-loading::before { animation: none; width: 100%; opacity: .5; }
+}
+
+.nv-web-message {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: var(--size-4-3);
+	padding: var(--size-4-6);
+	text-align: center;
+	color: var(--text-muted);
+	background-color: var(--background-primary);
+}
+
+.nv-url-setting .setting-item-control input[type="url"] {
+	width: min(100%, 22em);
+}

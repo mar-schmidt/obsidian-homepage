@@ -1,3 +1,8 @@
+> [!NOTE]
+> **About this fork.** This is *Homepage (Web)* (`homepage-web`), a fork of novov's Homepage that adds a **Web page** homepage action. Choose it under *Homepage action*, paste an address such as a Claude artifact link, and the page opens in a tab inside Obsidian. It uses the vault's browser session, the one Obsidian's own Web viewer uses, so a sign-in survives restarts. Web pages only open in the desktop app.
+>
+> Install it with [BRAT](https://github.com/TfTHacker/obsidian42-brat) (*Add beta plugin* → `mar-schmidt/obsidian-homepage`) and turn off the original Homepage plugin, since both register the same commands.
+
 # Homepage
 Set a specified note, canvas, base, or workspace that can be opened on startup, launched from the sidebar, or used as a command.
 <br>

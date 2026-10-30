@@ -14,6 +14,7 @@ declare module "obsidian" {
 		showReleaseNotes: () => void;
 		nvOrig_showReleaseNotes: () => void;
 		viewRegistry: ViewRegistry;
+		getWebviewPartition?: () => string;
 	}
 	
 	interface CommandRegistry {
@@ -88,6 +89,7 @@ declare module "obsidian" {
 	interface WorkspaceLeaf {
 		history: object;
 		parentSplit: WorkspaceSplit;
+		updateHeader?: () => void;
 	}
 	
 	interface WorkspaceMobileDrawer {

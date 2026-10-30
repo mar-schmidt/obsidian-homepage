@@ -16,6 +16,7 @@ export const EN: Record<string, string> = {
 	//Kind enum
 	//Ensure these terms are consistent with those used in base Obsidian!
 	[Kind.File]: "File",
+	[Kind.WebPage]: "Web page",
 	[Kind.Workspace]: "Workspace",
 	[Kind.Random]: "Random file",
 	[Kind.RandomFolder]: "Random in folder",
@@ -52,6 +53,13 @@ export const EN: Record<string, string> = {
 	homepageChanged: `The homepage has been changed to "?0".`,
 	momentUpgradeNotice: `Date-dependent notes in Homepage have been removed. Set your homepage as a Periodic or Daily Note instead.`,
 	openingFailed: `The homepage "?0" failed to open due to an error.`,
+	webPageInvalid: `"?0" isn't a web address the homepage can open.`,
+	webPageDesktopOnly: "Web page homepages only open in the desktop app.",
+	webPageTitle: "Homepage",
+	webOpenExternally: "Open in browser",
+	webReload: "Reload",
+	webLoadFailed: "The page didn't load (?0).",
+	webRetry: "Try again",
 	
 	//Settings items
 	homepageKind: "Homepage action",
@@ -104,6 +112,7 @@ export const EN: Record<string, string> = {
 	//Settings UI messages
 	"FileDesc": "Enter a note, base, or canvas to use.",
 	"WorkspaceDesc": "Enter an Obsidian workspace to use.",
+	"Web pageDesc": "Enter the address of a web page to use, such as a Claude artifact. It opens in a tab and stays signed in between sessions.",
 	"New noteDesc": "Enter a prefix to use. A note using that prefix will be created for each Obsidian session.",
 	"Graph viewDesc": "Your graph view will be used.",
 	"NothingDesc": "Nothing will occur by default. Any commands added will still take effect.",
@@ -116,5 +125,6 @@ export const EN: Record<string, string> = {
 	"Yearly NoteDesc": "Your Periodic Yearly Note will be used.",
 	homepageSettingTitle: "Homepage",
 	pluginUnavailableSettings: `The plugin required for this homepage type isn't available.`,
+	webPageInvalidSettings: "Enter a full web address that starts with https://",
 	copyDebugInfoNotice: "Copied homepage debug information to clipboard",
 };

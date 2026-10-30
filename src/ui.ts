@@ -226,7 +226,7 @@ export class CommandSuggestModal extends FuzzySuggestModal<unknown> {
 	}
 
 	onChooseItem(item: Command) {
-		if (item.id === "homepage:open-homepage") {
+		if (item.id === `${this.tab.plugin.manifest.id}:open-homepage`) {
 			new Notice(tr("commandsReally"));
 			return;
 		}

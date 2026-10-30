@@ -4,6 +4,7 @@ import { UNCHANGEABLE, HomepageData, Kind, Mode, View } from "./homepage";
 import { PERIODIC_KINDS } from "./periodic";
 import { CommandBox, JournalSuggest, Suggestor, WorkspaceSuggest } from "./ui";
 import { isSupportedExtension } from "./utils";
+import { normalizeUrl } from "./web";
 import { tr } from "./locale";
 
 type HomepageKey<T> = { [K in keyof HomepageData]: HomepageData[K] extends T ? K : never }[keyof HomepageData];
@@ -42,15 +43,15 @@ export const DEFAULT_DATA: HomepageData = {
 
 const DISABLED_KINDS: Partial<Record<HomepageKey<boolean | string>, Kind[]>> = {
 	openWhenEmpty: [Kind.Workspace, Kind.None],
-	alwaysApply: [Kind.Workspace, Kind.None],
+	alwaysApply: [Kind.Workspace, Kind.None, Kind.WebPage],
 	openMode: [Kind.Workspace, Kind.None],
 	manualOpenMode: [Kind.Workspace, Kind.None],
-	autoCreate: [Kind.Workspace, Kind.None],
+	autoCreate: [Kind.Workspace, Kind.None, Kind.WebPage],
 	pin: [Kind.Workspace, Kind.None],
-	view: [Kind.Workspace, Kind.None, Kind.Graph],
-	revertView: [Kind.Workspace, Kind.None, Kind.Graph],
-	autoScroll: [Kind.Workspace, Kind.None, Kind.Graph],
-	refreshDataview: [Kind.Workspace, Kind.None, Kind.Graph]
+	view: [Kind.Workspace, Kind.None, Kind.Graph, Kind.WebPage],
+	revertView: [Kind.Workspace, Kind.None, Kind.Graph, Kind.WebPage],
+	autoScroll: [Kind.Workspace, Kind.None, Kind.Graph, Kind.WebPage],
+	refreshDataview: [Kind.Workspace, Kind.None, Kind.Graph, Kind.WebPage]
 }
 
 export class HomepageSettingTab extends PluginSettingTab {
@@ -94,6 +95,9 @@ export class HomepageSettingTab extends PluginSettingTab {
 					setting.control = { 
 						type: "file", key: "value", filter: (f: TFile) => isSupportedExtension(this.app, f) 
 					}
+					break;
+				case Kind.WebPage:
+					setting.render = (s: Setting) => this.renderUrl(s);
 					break;
 				case Kind.Workspace:
 					setting.render = (s: Setting) => this.renderSuggestor(s, WorkspaceSuggest);
@@ -246,8 +250,13 @@ export class HomepageSettingTab extends PluginSettingTab {
 			}
 			dropdown.setValue(this.plugin.homepage.data.kind);
 			dropdown.onChange(async option => {
-				this.plugin.homepage.data.kind = option;
-				if (option as Kind == Kind.Random) this.plugin.homepage.data.value = "";
+				const data = this.plugin.homepage.data;
+				const previous = data.kind as Kind;
+				
+				data.kind = option;
+				if (option as Kind == Kind.Random) data.value = "";
+				else if (option as Kind == Kind.WebPage && !normalizeUrl(data.value)) data.value = "";
+				else if (previous == Kind.WebPage) data.value = DEFAULT_DATA.value;
 				
 				await this.plugin.homepage.save();
 				
@@ -276,6 +285,22 @@ export class HomepageSettingTab extends PluginSettingTab {
 				await this.plugin.homepage.save();
 			});
 		})
+	}
+	
+	renderUrl(setting: Setting) {
+		setting.settingEl.addClass("nv-url-setting");
+		setting.addText(text => {
+			text.inputEl.type = "url";
+			text.setPlaceholder("https://claude.ai/artifact/…");
+			text.setValue(this.plugin.homepage.data.value);
+			text.onChange(async value => {
+				const valid = !value.trim() || normalizeUrl(value) !== null;
+				
+				setting.setErrorMessage(valid ? null : tr("webPageInvalidSettings"));
+				this.plugin.homepage.data.value = value.trim();
+				await this.plugin.homepage.save();
+			});
+		});
 	}
 	
 	renderCommands(setting: Setting) {
@@ -336,7 +361,7 @@ export class HomepageSettingTab extends PluginSettingTab {
 			.onChange(async value => await this.setControlValue("autoCreate", value))
 		);
 		
-		if ([...PERIODIC_KINDS, Kind.Journal, Kind.Workspace, Kind.None].includes(kind)) {
+		if ([...PERIODIC_KINDS, Kind.Journal, Kind.Workspace, Kind.None, Kind.WebPage].includes(kind)) {
 			setting.setDisabled(true);
 		}
 		
